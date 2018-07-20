@@ -1,0 +1,24 @@
+---
+galaxy_info:
+  author: Coaxial
+  description: Install and configure InfluxDB
+  company: 64b.it
+  license: MIT
+  min_ansible_version: 2.4
+  platforms:
+    - name: ubuntu
+      versions:
+        - trusty
+        - xenial
+        - bionic
+        - cosmic
+        - jessie
+        - stretch
+  galaxy_tags:
+    - system
+    - monitoring
+    - database
+    - tsdb
+    - influxdb
+
+  dependencies: []
