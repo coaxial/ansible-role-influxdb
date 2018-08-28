@@ -1,14 +1,22 @@
 import os
 
 import testinfra.utils.ansible_runner
+from distutils.version import LooseVersion
 
 testinfra_hosts = testinfra.utils.ansible_runner.AnsibleRunner(
     os.environ['MOLECULE_INVENTORY_FILE']).get_hosts('all')
 
 
-def test_example(host):
-    file = host.file('/etc/hosts')
+def test_influxdb_service(host):
+    s = host.service('influxdb')
 
-    assert file.exists
-    assert file.user == 'root'
-    assert file.group == 'root'
+    assert s.is_enabled
+    assert s.is_running
+
+
+def test_influxdb_package(host):
+    p = host.package("influxdb")
+
+    assert p.is_installed
+    # 1.6.2 is the most recent version when writing this test
+    assert LooseVersion(p.version) >= LooseVersion('1.6.2')

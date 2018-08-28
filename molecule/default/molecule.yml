@@ -6,18 +6,14 @@ driver:
 lint:
   name: yamllint
 platforms:
-  - name: ubuntu_trusty
-    alias: 'ubuntu:14.04'
-  - name: ubuntu_xenial
-    alias: 'ubuntu:16.04'
-  - name: ubuntu_bionic
-    alias: 'ubuntu:18.04'
-  - name: ubuntu_cosmic
-    alias: 'ubuntu:18.10'
-  - name: debian_jessie
-    alias: 'images:debian/8'
-  - name: debian_stretch
-    alias: 'images:debian/9'
+  - name: ubuntu-xenial
+    alias: ubuntu/xenial
+  - name: ubuntu-bionic
+    alias: ubuntu/bionic
+  - name: debian-jessie
+    alias: debian/jessie
+  - name: debian-stretch
+    alias: debian/stretch
 
 provisioner:
   name: ansible
