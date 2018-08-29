@@ -20,3 +20,19 @@ def test_influxdb_package(host):
     assert p.is_installed
     # 1.6.2 is the most recent version when writing this test
     assert LooseVersion(p.version) >= LooseVersion('1.6.2')
+
+
+def test_config_file(host):
+    f = host.file('/etc/influxdb/influxdb.conf')
+
+    assert f.user == 'root'
+    assert f.group == 'root'
+    assert f.mode == 0o644
+
+
+def test_config_dir(host):
+    f = host.file('/etc/influxdb')
+
+    assert f.user == 'root'
+    assert f.group == 'root'
+    assert f.mode == 0o755

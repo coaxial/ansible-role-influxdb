@@ -22,3 +22,19 @@
     name: influxdb
     state: present
   notify: Start InfluxDB
+
+- name: Create influxdb config dir
+  file:
+    path: /etc/influxdb
+    owner: root
+    group: root
+    mode: 0o755
+
+- name: Copy configuration file
+  copy:
+    src: files/influxdb.conf
+    dest: /etc/influxdb/influxdb.conf
+    owner: root
+    group: root
+    mode: 0o644
+  notify: Start InfluxDB
