@@ -1,5 +1,22 @@
 ---
 - name: Converge
   hosts: all
+  vars:
+    idb__admin_users:
+      - name: admin
+        password: secret
+    idb__regular_users:
+      - name: jdoe
+        password: hunter2
+      - name: otheruser
+        password: letmein
+    idb__databases:
+      - name: 'testdb'
+        retention: '14d'
+        users:
+          - name: jdoe
+            privilege: ALL
+          - name: otheruser
+            privilege: READ
   roles:
     - name: ansible-role-influxdb

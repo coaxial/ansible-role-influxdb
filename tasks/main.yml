@@ -1,13 +1,12 @@
 ---
-- name: Install certificates bundle
+- name: Install required packages
   package:
-    name: ca-certificates
+    name: "{{ item }}"
     state: present
-
-- name: Enable apt downloads over https
-  package:
-    name: apt-transport-https
-    state: present
+  with_items:
+    - ca-certificates
+    - apt-transport-https
+    - jq
 
 - name: Add InfluxDB repository key
   apt_key:
@@ -21,7 +20,7 @@
   package:
     name: influxdb
     state: present
-  notify: Start InfluxDB
+  notify: Restart InfluxDB
 
 - name: Create influxdb config dir
   file:
@@ -37,4 +36,66 @@
     owner: root
     group: root
     mode: 0o644
-  notify: Start InfluxDB
+  notify: Restart InfluxDB
+
+- name: Ensure InfluxDB is running
+  service:
+    name: influxdb
+    state: started
+
+- name: Check if database already exists
+  # see all existing databases and skip the first three header lines
+  shell: influx -execute 'SHOW DATABASES' | sed 1,3d
+  register: idb__databases_check_cmd
+  changed_when: false
+
+- name: Check if users already exist
+  shell: influx -execute 'SHOW USERS' | sed 1,2d
+  register: idb__user_check_cmd
+  changed_when: false
+
+- name: Create admin users
+  shell: |
+    influx -execute 'CREATE USER "{{ item.name }}" WITH PASSWORD '"'"'{{ item.password }}'"'"' WITH ALL PRIVILEGES;'
+  when: item.name not in idb__user_check_cmd.stdout
+  with_items: "{{ idb__admin_users }}"
+  notify: Admin users changed
+
+- name: Create regular users
+  shell: |
+    influx -execute 'CREATE USER "{{ item.name }}" WITH PASSWORD '"'"'{{ item.password }}'"'"';'
+  when: item.name not in idb__user_check_cmd.stdout
+  with_items: "{{ idb__regular_users }}"
+  notify: Regular users changed
+
+- name: Create databases
+  shell: influx -execute 'CREATE DATABASE {{ item.name }};'
+  when: item.name not in idb__databases_check_cmd.stdout
+  with_items: "{{ idb__databases }}"
+  notify: Databases changed
+
+- name: Check current autogen retention values
+  # this will return a json array like [{"name":"dbname","retention":"0s"}]
+  # with an object for each database checked
+  shell: |
+    for db in {{ item.name }}; do influx -execute "SHOW RETENTION POLICIES ON $db" -format json | jq '.results[0].series[0].values | select(.[][0] = "autogen")' | jq -c -M --arg dbname "$db" '{name:$dbname,retention:.[0][1]}'; done | jq -s -c -M '.'
+  changed_when: false
+  register: idb__autogen_ret_vals_cmd
+  with_items: "{{ idb__databases }}"
+
+- name: Set current autogen retention policies as fact
+  set_fact:
+    idb__original_autogen_retention: "{{ idb__autogen_ret_vals_cmd.results[0].stdout | from_json }}"
+
+- name: Adjust autogen retention policies
+  shell: |
+    influx -execute 'ALTER RETENTION POLICY "autogen" ON "{{ item.name }}" DURATION {{ item.retention }} REPLICATION 1 SHARD DURATION {{ item.retention }} DEFAULT;' &&
+    influx -execute "SHOW RETENTION POLICIES ON {{ item.name }}" -format json | jq -c -M '.results[0].series[0].values | select(.[][0] = "autogen")' | jq -c -M '.[0][1]';
+  # the query will run every time, but it will only show as changed when the
+  # new retention is different from the original one. It's necessary to compare
+  # the result from queries to influx because every duration is converted into
+  # hms durations so 7d would output 168h0m0s when queried.
+  register: idb__adjust_ret
+  changed_when: idb__adjust_ret.stdout | from_json != (idb__original_autogen_retention | selectattr("name", "equalto", item.name) | map(attribute="retention") | list)[0]
+  when: item.retention is defined
+  with_items: "{{ idb__databases }}"

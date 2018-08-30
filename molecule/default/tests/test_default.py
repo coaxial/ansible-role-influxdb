@@ -1,4 +1,5 @@
 import os
+import re
 
 import testinfra.utils.ansible_runner
 from distutils.version import LooseVersion
@@ -36,3 +37,35 @@ def test_config_dir(host):
     assert f.user == 'root'
     assert f.group == 'root'
     assert f.mode == 0o755
+
+
+def test_db_creation(host):
+    # The first three lines are headers
+    dblist = host.check_output('influx -execute "SHOW DATABASES" | sed 1,3d')
+
+    assert 'testdb' in dblist
+
+
+def test_users_creation(host):
+    userlist = host.check_output('influx -execute "SHOW USERS" | sed 1,2d')
+
+    assert re.compile(r'admin\s+true').search(userlist)
+    assert re.compile(r'jdoe\s+false').search(userlist)
+    assert re.compile(r'otheruser\s+false').search(userlist)
+
+
+def test_retention(host):
+    ret = host.check_output('influx -execute "SHOW RETENTION POLICIES ON'
+                            ' testdb" | sed 1,2d')
+
+    assert re.compile(r'autogen\s+336h0m0s').search(ret)
+
+
+def test_db_grants(host):
+    jdoegrants = host.check_output(
+        'influx -execute "SHOW GRANTS FOR jdoe" | sed 1,2d')
+    otherusergrants = host.check_output(
+        'influx -execute "SHOW GRANTS FOR otheruser" | sed 1,2d')
+
+    assert re.compile(r'testdb\s+ALL PRIVILEGES').search(jdoegrants)
+    assert re.compile(r'testdb\s+READ').search(otherusergrants)

@@ -1,6 +1,16 @@
 ---
-- name: Start InfluxDB
+- name: Restart InfluxDB
   service:
     name: influxdb
     state: restarted
     enabled: true
+
+- name: Grant access to users
+  shell: influx -execute 'GRANT {{ item.1.privilege }} ON {{ item.0.name }} TO {{ item.1.name }};'
+  with_subelements:
+    - "{{ idb__databases }}"
+    - users
+  listen:
+    - Admin users changed
+    - Regular users changed
+    - Databases changed
